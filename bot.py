@@ -8,7 +8,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from apscheduler.schedulers.background import BackgroundScheduler
 import threading
 
-TOKEN = "7381017456:AAGfHPIbC67w3yZRik65AFObrNive24UWJ0"
+TOKEN = "7915865978:AAEcIjjwfzLJu-5RMNGW8BV0SzDIuee6GyA"
 
 # Ayarlar
 timeframe = '4h'
