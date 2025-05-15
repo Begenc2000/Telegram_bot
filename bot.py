@@ -6,7 +6,7 @@ from telegram import Update
 from telegram.ext import Updater, CommandHandler, CallbackContext
 
 # Telegram Bot Token
-TOKEN = "7706211608:AAG-N4sLZ4hJoVvw48ZPLeb0uvxn8sDjbkQ"  # Buraya kendi bot token'ınızı yazın
+TOKEN = "7381017456:AAGfHPIbC67w3yZRik65AFObrNive24UWJ0"  # Buraya kendi bot token'ınızı yazın
 
 # Başlangıç ayarları
 timeframe = '4h'
