@@ -23,7 +23,7 @@ exchange = ccxt.binance({
 
 def get_symbols():
     markets = exchange.load_markets()
-    return [symbol for symbol in markets if symbol.endswith('/USDT') and not symbol.startswith('1000')]
+    return [symbol for symbol in markets if symbol.endswith('/USDT') and not symbol.startswith('1000') and not symbol.startswith('USD')]
 
 
 def fetch_ohlcv(symbol, tf):
