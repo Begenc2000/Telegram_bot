@@ -1,100 +1,104 @@
 import logging
-from telegram import Update
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 import ccxt
-import talib
+import pandas as pd
+import pandas_ta as ta
+from telegram import Update
+from telegram.ext import Updater, CommandHandler, CallbackContext
 
-# Bot Token
-TOKEN = '7915865978:AAEcIjjwfzLJu-5RMNGW8BV0SzDIuee6GyA'
+# Telegram Bot Token
+TOKEN = "7915865978:AAEcIjjwfzLJu-5RMNGW8BV0SzDIuee6GyA"  # Buraya kendi bot token'ınızı yazın
 
-# Logging
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                    level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Başlangıç ayarları
+timeframe = '4h'
+squeeze_threshold = 1.0  # yüzde
 
-# Borsaya Bağlantı (BingX API)
-exchange = ccxt.bingx({
-    'apiKey': '4qLGzeAiRO7vLjQmWk21lfFJpeP8wh7IIS60ERf0zAdSemRCYAhWjGDH6MfmCpU5WZ5t0mqIShG2cO4oJqQ',
-    'secret': '5yrz8BdFeppsi665Xkcu19CVfD7DOssphaZ0IGstg2TZfOCuQYQIEjBhsn3kFGrpX2cPhBMcSAU20yFhzSvA',
+# Telegram log
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+
+# Binance verisi için
+exchange = ccxt.binance({
+    'enableRateLimit': True
 })
 
-# Kullanıcıya sunulacak seçenekler
-def start(update: Update, context: CallbackContext):
-    update.message.reply_text(
-        "Merhaba! Trading botumuza hoş geldiniz.\n\n"
-        "Analiz yapmak için aşağıdaki seçeneklerden birini seçebilirsiniz:\n\n"
-        "/set_timedelta - Zaman dilimini seçin\n"
-        "/set_rsi - RSI eşik değerini belirleyin\n"
-        "/set_macd - MACD parametrelerini belirleyin\n"
-        "/set_volatility - Volatilite kriterlerini ayarlayın\n"
-    )
 
-# Zaman Dilimi Seçimi
-def set_timedelta(update: Update, context: CallbackContext):
-    update.message.reply_text(
-        "Zaman dilimini seçin:\n"
-        "1. 15 Dakika\n"
-        "2. 1 Saat\n"
-        "3. 4 Saat\n"
-        "4. 1 Gün"
-    )
+def get_symbols():
+    markets = exchange.load_markets()
+    return [symbol for symbol in markets if symbol.endswith('/USDT') and not symbol.startswith('1000')]
 
-# RSI Seçimi
-def set_rsi(update: Update, context: CallbackContext):
-    update.message.reply_text(
-        "RSI eşiğini seçin:\n"
-        "1. Aşırı Satım (30 altı)\n"
-        "2. Aşırı Alım (70 üstü)"
-    )
 
-# MACD Seçimi
-def set_macd(update: Update, context: CallbackContext):
-    update.message.reply_text(
-        "MACD parametrelerini seçin:\n"
-        "1. Kısa vadeli MACD'nin uzun vadeli MACD'yi yukarıya kesmesi (alım sinyali)\n"
-    )
+def fetch_ohlcv(symbol, tf):
+    try:
+        ohlcv = exchange.fetch_ohlcv(symbol, tf, limit=100)
+        df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+        return df
+    except Exception:
+        return None
 
-# Volatilite Seçimi
-def set_volatility(update: Update, context: CallbackContext):
-    update.message.reply_text(
-        "Volatilite kriterlerini ayarlayın:\n"
-        "1. Bollinger Bands\n"
-        "2. Fiyat Dalgalanması"
-    )
 
-# Verileri Analiz Etme (Kısa Örnek)
-def analyze(update: Update, context: CallbackContext):
-    symbol = "BTC/USDT"
-    timeframe = '1h'  # Örneğin 1 saatlik zaman dilimi
+def is_bollinger_squeeze(df, threshold):
+    bb = ta.bbands(df['close'], length=20, std=2)
+    if bb is None or bb['BBU_20_2.0'].isna().all():
+        return False
+    df = df.join(bb)
+    df.dropna(inplace=True)
+    if df.empty:
+        return False
+    latest = df.iloc[-1]
+    width = (latest['BBU_20_2.0'] - latest['BBL_20_2.0']) / latest['BBM_20_2.0'] * 100
+    return width < threshold
 
-    # Binance'den veri çekme
-    ohlcv = exchange.fetch_ohlcv(symbol, timeframe)
-    close_prices = [x[4] for x in ohlcv]
 
-    # RSI hesaplama
-    rsi = talib.RSI(close_prices, timeperiod=14)
-    last_rsi = rsi[-1]
+def scan(update: Update, context: CallbackContext):
+    update.message.reply_text(f"Taranıyor... Zaman dilimi: {timeframe}, Sıkışma eşiği: %{squeeze_threshold}")
+    coins = get_symbols()
+    matched = []
 
-    # Eğer RSI 30'un altında ise, alım sinyali
-    if last_rsi < 30:
-        update.message.reply_text(f"RSI: {last_rsi} - Aşırı Satım! Potansiyel alım sinyali.")
+    for coin in coins:
+        df = fetch_ohlcv(coin, timeframe)
+        if df is not None and is_bollinger_squeeze(df, squeeze_threshold):
+            matched.append(coin)
+
+    if matched:
+        text = "Sıkışma tespit edilen coinler:\n" + "\n".join(matched)
     else:
-        update.message.reply_text(f"RSI: {last_rsi} - Durum: Normal")
+        text = "Sıkışma bulunan coin yok."
+    update.message.reply_text(text)
 
-# Main
+
+def set_timeframe(update: Update, context: CallbackContext):
+    global timeframe
+    if context.args and context.args[0] in ['4h', '1d']:
+        timeframe = context.args[0]
+        update.message.reply_text(f"Zaman dilimi {timeframe} olarak ayarlandı.")
+    else:
+        update.message.reply_text("Kullanım: /set_timeframe 4h veya 1d")
+
+
+def set_threshold(update: Update, context: CallbackContext):
+    global squeeze_threshold
+    try:
+        value = float(context.args[0])
+        squeeze_threshold = value
+        update.message.reply_text(f"Sıkışma eşiği %{value} olarak ayarlandı.")
+    except:
+        update.message.reply_text("Kullanım: /set_threshold 1.5")
+
+
+def start(update: Update, context: CallbackContext):
+    update.message.reply_text("Bollinger Sıkışma Botu başlatıldı!\nKomutlar:\n/scan\n/set_timeframe [4h|1d]\n/set_threshold [yüzde]")
+
 def main():
     updater = Updater(TOKEN, use_context=True)
     dp = updater.dispatcher
 
     dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(CommandHandler("set_timedelta", set_timedelta))
-    dp.add_handler(CommandHandler("set_rsi", set_rsi))
-    dp.add_handler(CommandHandler("set_macd", set_macd))
-    dp.add_handler(CommandHandler("set_volatility", set_volatility))
-    dp.add_handler(CommandHandler("analyze", analyze))
+    dp.add_handler(CommandHandler("scan", scan))
+    dp.add_handler(CommandHandler("set_timeframe", set_timeframe))
+    dp.add_handler(CommandHandler("set_threshold", set_threshold))
 
     updater.start_polling()
     updater.idle()
+
 
 if __name__ == '__main__':
     main()
