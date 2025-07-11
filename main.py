@@ -35,7 +35,7 @@ api_hash_2 = os.getenv('API_HASH_2', 'your_api_hash_2_here')
 SEND_EVERY_MINUTES = 120  # Kaç dakikada bir gönderi yapılacak
 DELAY_BETWEEN_ACCOUNTS = 12  # Hesaplar arası bekleme (10-15 dakika)
 from_chat = '@begacloudmining'
-message_id = 3014
+message_id = 3019
 
 # HESAP 1 GRUPLARI
 GROUPS_ACCOUNT_1 = [
