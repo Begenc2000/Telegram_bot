@@ -1,3 +1,4 @@
+
 from telethon import TelegramClient
 import asyncio
 import datetime
@@ -22,13 +23,14 @@ def keep_alive():
     t.start()
 
 # ================== AYARLAR =================== #
+# Environment variables'dan alınacak (Replit Secrets kullanın)
 # HESAP 1
-api_id_1 = int(os.getenv('API_ID', '24470698'))
-api_hash_1 = os.getenv('API_HASH', '15b8f5e1ab2d439fab2cf16269d93d32')
+api_id_1 = int(os.getenv('API_ID', '0'))
+api_hash_1 = os.getenv('API_HASH', 'your_api_hash_here')
 
 # HESAP 2
-api_id_2 = int(os.getenv('API_ID_2', '20853297'))
-api_hash_2 = os.getenv('API_HASH_2', 'd0e8ea663071ca7b06cf343d3526f191')
+api_id_2 = int(os.getenv('API_ID_2', '0'))
+api_hash_2 = os.getenv('API_HASH_2', 'your_api_hash_2_here')
 
 SEND_EVERY_MINUTES = 120  # Kaç dakikada bir gönderi yapılacak
 DELAY_BETWEEN_ACCOUNTS = 12  # Hesaplar arası bekleme (10-15 dakika)
@@ -106,6 +108,16 @@ async def main_loop():
         await asyncio.sleep(random_minutes * 60)
 
 async def run_bot():
+    # API bilgileri kontrolü
+    if api_id_1 == 0 or api_hash_1 == 'your_api_hash_here':
+        print("❌ HATA: API_ID ve API_HASH environment variables'ları ayarlanmamış!")
+        print("Replit Secrets kullanarak şu değerleri ekleyin:")
+        print("- API_ID")
+        print("- API_HASH") 
+        print("- API_ID_2")
+        print("- API_HASH_2")
+        return
+    
     await client_1.start()
     await client_2.start()
     print("🤖 İki hesap da başlatıldı!")
